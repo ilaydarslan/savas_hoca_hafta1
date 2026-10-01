@@ -1,0 +1,13 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import {BrowserRouter,Routes,Route} from 'react-router-dom'
+import {AuthProvider} from './auth/AuthContext'
+import {Layout,AdminGuard} from './components/Layout'
+import {AuthPage} from './pages/Auth'
+import {Dashboard} from './pages/Dashboard'
+import {Topics,NewTopic,Votes} from './pages/Topics'
+import {TopicDetail} from './pages/TopicDetail'
+import {Ledger,Graph,Rules,Profile,AdminHome,AdminUsers,AdminRules,NotFound} from './pages/System'
+import './styles.css'
+import './academic.css'
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><BrowserRouter><AuthProvider><Routes><Route path="/login" element={<AuthPage/>}/><Route path="/register" element={<AuthPage register/>}/><Route element={<Layout/>}><Route index element={<Dashboard/>}/><Route path="topics" element={<Topics/>}/><Route path="topics/new" element={<NewTopic/>}/><Route path="topics/:id" element={<TopicDetail/>}/><Route path="votes" element={<Votes/>}/><Route path="graph" element={<Graph/>}/><Route path="ledger" element={<Ledger/>}/><Route path="rules" element={<Rules/>}/><Route path="profile" element={<Profile/>}/><Route element={<AdminGuard/>}><Route path="admin" element={<AdminHome/>}/><Route path="admin/users" element={<AdminUsers/>}/><Route path="admin/rules" element={<AdminRules/>}/></Route><Route path="*" element={<NotFound/>}/></Route></Routes></AuthProvider></BrowserRouter></React.StrictMode>)

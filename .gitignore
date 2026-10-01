@@ -1,0 +1,16 @@
+.pnpm-store/
+tmp/
+output/
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+dist/
+*.tsbuildinfo
+*.log
+*.db
+*.db-*
+.env
+.env.*
+!.env.example
+.jwt-secret

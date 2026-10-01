@@ -1,0 +1,9 @@
+export type Tag = {id:number; name:string}
+export type User = {authority_scopes:string[];id:number; first_name:string; last_name:string; username:string; email:string; role:'USER'|'EXPERT'|'ADMIN'; points:number; reputation_coefficient:number; team:string|null; team_id:number|null; tags:Tag[]; address:string; birth_date:string|null}
+export type Summary = {yes:number; no:number; abstain:number; participants:number; yes_ratio:number; affected_support:number|null; affected_participants:number; quorum:number; quorum_met:boolean; majority_met:boolean; minority_conflict:boolean}
+export type Topic = {decision_scope:string;authority:{scope:string;label:string;body:string;authorized:boolean;restricted:boolean;requested:boolean;demo:boolean};id:number; title:string; description:string; category:string; created_by:number; creator:string; created_at:string; affected_team_id:number|null; affected_team:string|null; impact_level:string; status:string; decision_flag:string|null; policy_status:string; tags:Tag[]; votes:Summary; can_vote:boolean; my_vote:string|null; can_manage:boolean; can_review:boolean; can_apply:boolean}
+export type Rule = {id:number; code:string; name:string; description:string; category:string; condition:{kind:string;value:number}; severity:string}
+export type Pending = {target_type:string; target_id:number; topic_id:number; title:string; votes:Summary}
+export type PointEvent = {id:number; amount:number; reason:string; topic_id:number; created_at:string}
+export type LedgerStatus = {verified:boolean; count:number; head_hash?:string; error_at?:number}
+export type DashboardData = {user:User; created_topics:number; accepted_topics:number; votes_cast:number; discussion_contributions:number; expert_reviews:number; pending_votes:Pending[]; ledger:LedgerStatus; activities:PointEvent[]; my_votes:{id:number; choice:string; topic_id:number|null;subtopic_id:number|null;deletion_proposal_id:number|null}[]}
