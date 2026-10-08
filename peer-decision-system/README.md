@@ -112,7 +112,7 @@ Seed: **10 USER, 2 EXPERT, 1 ADMIN; 3 takım; 5 tag; 8 konu; 5 kural; 37 oy; 18 
 3. İlgili üç farklı hesapla oy kullanın. `demo10@example.com` yalnızca Cyber Security ilgisine sahiptir; diğer takımlara/alanlara ait konularda oy veremez.
 4. Konu sahibi veya yönetici oylamayı sonuçlandırsın. Yeterli katılım yoksa oylama açık kalır.
 5. **Konu #3: Tasarım stüdyosunun ortak kullanım saatleri** genel destek yüksek olmasına rağmen etkilenen takım desteği yetersiz olduğu için `MINORITY_CONFLICT` gösterir.
-6. **Konu #4: Araştırma verileri için açık veri deposu** kabul edilmiştir, ancak yüksek etkili karar için bilirkişi görüşü eksik olduğundan `RULE-004` nedeniyle `BLOCKED` durumundadır. İlgili uzman görüş ekleyebilir; konu sahibi/yönetici politika kontrolünü yeniden çalıştırabilir.
+6. **Konu #4: Araştırma verileri için açık veri deposu** kabul edilmiştir, ancak yüksek etkili karar için bilirkişi görüşü eksik olduğundan `RULE-004` nedeniyle `BLOCKED` durumundadır. İlgili uzman görüş eklediğinde politika kontrolü otomatik yenilenir. Yetkili konu yöneticisi kontrolü ayrıca elle çalıştırabilir.
 7. Kabul edilmiş **konu #1** altında tartışma, alt konular ve mesaj #1 için açık arşivleme teklifini gösterin. Teklife üç evet oyu verip sonuçlandırınca mesaj `ARCHIVED` olur; içerik ve geçmiş yerinde kalır.
 8. Graph'ta ilişki türüyle filtreleyin; bir düğüme tıklayarak komşularını inceleyin.
 9. Ledger zincirini doğrulayın, bir kaydı açarak önceki hash, veri hash'i ve içeriğini görün.
@@ -201,3 +201,18 @@ Testler izole in-memory SQLite üzerinde çalışır; demo verilerini değiştir
 ## MVP sınırları
 
 Gerçek blockchain, ücretli AI, e-posta doğrulaması, parola sıfırlama, dosya yükleme, bildirim gönderimi ve harici karar yürütme yoktur. Takım/ilgi alanları demo kapsamında kullanıcı tarafından seçilir; üretimde üyelik doğrulaması gerekir. Kullanıcı ve kural yönetimi ekleme/düzenleme odaklıdır; audit ilişkilerini korumak için kullanıcı/kural fiziksel silme sunulmaz. Konu statü enum'unda ARCHIVED bulunur; bu sürüm konu arşivleme için ayrıca iş akışı sunmaz. Mesaj arşivleme tam çalışır. TestClient bağımlılığından bir upstream deprecation uyarısı gelebilir; test başarısını etkilemez.
+
+## Revizyon tasarım notları
+
+Gereksinim–kod–test eşlemesi, sınıf ve sekans diyagramları, konu durum modeli ve bağımlılık grafı [geliştirme tasarım notlarında](docs/design.md) bulunur. Bu belge nihai ders raporu değildir; paylaşılan dört PDF ile uygulama eşlemesi içerir.
+
+Yönetmelik değerlendirmesinde GoF Strategy (`services/policy.py`) kullanılır. Kayıt defteri (`ledger.py`) ve puanlama (`points.py`) karar akışından ayrılmıştır. Analiz sağlayıcısı FastAPI bağımlılık enjeksiyonuyla değiştirilebilir. Bilirkişi talebi ilgili yeni görüşle çözülür; kabul edilmiş konunun politikası yeniden hesaplanır. Azınlık koruması ve eşit oy kuralları korunur. Kurumsal konuların bilirkişi talebi ve politika kontrolü ilgili kurul üyeliği gerektirir.
+
+
+### Analiz ve tasarım ekranı
+
+`http://localhost:5173/engineering` adresindeki **Analiz ve tasarım** menüsü üç bölüm içerir: kaydedilebilir problem kanvası, çalıştırılabilir baseline/hata analizi ve görsel tasarım diyagramları. Kanvas tüm üyelere görünür; `admin@example.com` hesabı düzenleyebilir. Kayıtlar SQLite içinde saklanır ve işlem defterine işlenir.
+
+Yeni konu formundaki kapsam yardımcısı başlık ve gerekçeyi Türkçe anahtar kelimelerle inceler. Kullanıcı öneriyi açıkça seçmedikçe alan değişmez; yardımcı herhangi bir kurul üyeliği veya oy hakkı sağlamaz.
+
+Ölçüm verisi `backend/app/data/scope_benchmark.json` içindeki 32 sentetik örnektir. Gerçek veri veya bağımsız test kümesi değildir. Veri hash'i, sonuçlar ve hata örnekleri ölçüm ekranında gösterilir. Gerçek LLM/API yoktur; kararlar açık kurallarla alınır.

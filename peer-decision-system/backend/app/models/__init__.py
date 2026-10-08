@@ -167,3 +167,12 @@ class AuthorityMembership(Base):
     user_id = Column(ForeignKey('users.id'), primary_key=True)
     scope = Column(String(20), primary_key=True)
     __table_args__ = (CheckConstraint("scope IN ('DEPARTMENT','FACULTY','UNIVERSITY')"),)
+
+
+class ProjectCanvas(Base):
+    __tablename__ = 'project_canvas'
+    id = Column(Integer, primary_key=True)
+    fields = Column(JSON, nullable=False)
+    updated_by = Column(ForeignKey('users.id'), nullable=False)
+    updated_at = Column(String, default=now, nullable=False)
+    __table_args__ = (CheckConstraint('id = 1'),)

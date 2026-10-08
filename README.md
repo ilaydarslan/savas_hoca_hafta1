@@ -21,3 +21,13 @@ Kaynak kodlar, demo hesapları ve ayrıntılı kurulum adımları [peer-decision
 GitHub deposu kaynak kodları paylaşır. Uygulamanın çevrimiçi çalışması için ayrıca sunucuya kurulması gerekir.
 
 Yerel veritabanı, oturum anahtarı, bağımlılık klasörleri ve günlükler depoya dahil edilmez. Kurulum sırasında örnek veriler demo oluşturma komutuyla hazırlanır.
+
+
+## Analiz, diyagramlar ve son düzenlemeler
+
+Uygulamadaki **Analiz ve tasarım** menüsünden problem kanvası, ölçüm/hata analizi ve tasarım diyagramları açılır. **İlişki haritası** ise veritabanındaki güncel kullanıcı, takım, konu, oy ve tartışma ilişkilerini gösterir.
+
+- [Graf ve diyagramları nerede, nasıl kullanıyoruz?](peer-decision-system/docs/diagram-guide.md)
+- [Gereksinim–kod–test eşlemesi ve tasarım notları](peer-decision-system/docs/design.md)
+
+Revizyon: GoF Strategy ile yönetmelik değerlendirmesi; ayrı puan ve kayıt defteri servisleri; bilirkişi talebi ve kurul yetkisi düzeltmeleri; kaydedilebilir problem kanvası; sentetik baseline ölçümü; insan onaylı kapsam önerisi. Yerel veriler ve oturum anahtarları paylaşılmaz.

@@ -1,51 +1,15 @@
-import hashlib
-import json
 from sqlalchemy import select, func
 from fastapi import HTTPException
-from app.models import *
+from app.models import Topic, SubTopic, DeletionProposal, DiscussionMessage, Vote, Rule, RuleCheck, ExpertReview
 from app.services.authority import authorized, scope_of, require_authority, can_manage
+from app.services.records import require
+from app.services.ledger import append_ledger, verify_ledger
+from app.services.points import award, DAILY_POINT_LIMIT, TOPIC_POINT_LIMIT
+from app.services.policy import PolicyContext, policy_engine
 
 QUORUM = 3
-DAILY_POINT_LIMIT = 10
-TOPIC_POINT_LIMIT = 8
 TARGETS = {'TOPIC': (Topic, 'topic_id'), 'SUBTOPIC': (SubTopic, 'subtopic_id'), 'DELETION': (DeletionProposal, 'deletion_proposal_id')}
-def require(db, model, id):
-    obj = db.get(model, id)
-    if obj is None:
-        raise HTTPException(404, 'Kayıt bulunamadı.')
-    return obj
-def digest(data):
-    return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-def append_ledger(db, event, entity, id, payload):
-    previous = db.scalar(select(LedgerEntry).order_by(LedgerEntry.id.desc()).limit(1))
-    entry = LedgerEntry(event_type=event, entity_type=entity, entity_id=id, payload=payload,
-                        data_hash=digest(payload), previous_hash=previous.current_hash if previous else '0'*64, created_at=now())
-    entry.current_hash = digest([entry.event_type, entry.entity_type, entry.entity_id, entry.data_hash, entry.previous_hash, entry.created_at])
-    db.add(entry)
-    db.flush()
-    return entry
-def verify_ledger(db):
-    previous = '0'*64
-    entries = db.scalars(select(LedgerEntry).order_by(LedgerEntry.id)).all()
-    for entry in entries:
-        expected = digest([entry.event_type, entry.entity_type, entry.entity_id, digest(entry.payload), previous, entry.created_at])
-        if entry.previous_hash != previous or entry.data_hash != digest(entry.payload) or expected != entry.current_hash:
-            return {'verified': False, 'count': len(entries), 'error_at': entry.id}
-        previous = entry.current_hash
-    return {'verified': True, 'count': len(entries), 'head_hash': previous}
-def award(db, user_id, topic_id, amount, reason, source):
-    if db.scalar(select(PointEvent).where(PointEvent.source == source)):
-        return
-    daily = db.scalar(select(func.coalesce(func.sum(PointEvent.amount), 0)).where(PointEvent.user_id == user_id, PointEvent.created_at >= now()[:10]))
-    topic_points = db.scalar(select(func.coalesce(func.sum(PointEvent.amount), 0)).where(PointEvent.user_id == user_id, PointEvent.topic_id == topic_id))
-    amount = min(amount, DAILY_POINT_LIMIT-daily, TOPIC_POINT_LIMIT-topic_points)
-    if amount <= 0:
-        return
-    db.add(PointEvent(user_id=user_id, topic_id=topic_id, amount=amount, reason=reason, source=source))
-    user = require(db, User, user_id)
-    user.points += amount
-    user.reputation_coefficient = round(min(1.2, max(.8, 1 + user.points / 100)), 2)
-    db.flush()
+
 def eligible(user, topic):
     if scope_of(topic) != 'COMMUNITY':
         return authorized(user, topic)
@@ -86,17 +50,17 @@ def cast_vote(db, user, kind, id, choice):
     return vote
 def check_policy(db, topic):
     s = summary(db, topic)
+    context = PolicyContext(
+        high_impact=topic.impact_level == 'HIGH',
+        affected_team=topic.affected_team_id is not None,
+        yes_ratio=s['yes_ratio'], affected_support=s['affected_support'],
+        participants=s['participants'],
+        expert_reviews=db.scalar(select(func.count()).select_from(ExpertReview).where(ExpertReview.topic_id == topic.id)),
+        description_length=len(topic.description),
+    )
     statuses = []
     for rule in db.scalars(select(Rule).order_by(Rule.id)):
-        kind, value = rule.condition['kind'], rule.condition['value']
-        failed = {
-            'HIGH_SUPPORT': topic.impact_level == 'HIGH' and s['yes_ratio'] < value,
-            'MINORITY_SUPPORT': topic.affected_team_id is not None and (s['affected_support'] is None or s['affected_support'] < value),
-            'QUORUM': s['participants'] < value,
-            'EXPERT_REVIEW': topic.impact_level == 'HIGH' and len(db.scalars(select(ExpertReview).where(ExpertReview.topic_id == topic.id)).all()) < value,
-            'DESCRIPTION_LENGTH': len(topic.description) < value,
-        }[kind]
-        status = rule.severity if failed else 'COMPLIANT'
+        status = policy_engine.evaluate(rule.condition['kind'], rule.condition['value'], rule.severity, context)
         statuses.append(status)
         db.add(RuleCheck(topic_id=topic.id, rule_id=rule.id, status=status, detail=f'{rule.code}: {rule.name} — {rule.description}'))
     topic.policy_status = 'BLOCKED' if 'BLOCKED' in statuses else 'WARNING' if 'WARNING' in statuses else 'COMPLIANT'
@@ -124,7 +88,8 @@ def close_vote(db, user, kind, id):
         return {'status': 'VOTING', 'decision_flag': 'MINORITY_CONFLICT', 'message': 'Etkilenen grubun desteği yetersiz olduğu için karar yeniden değerlendirmeye gönderildi.'}
     obj.status = 'ACCEPTED' if s['majority_met'] else 'REJECTED'
     if kind == 'TOPIC':
-        topic.decision_flag = None
+        if topic.decision_flag == 'MINORITY_CONFLICT':
+            topic.decision_flag = None
         if obj.status == 'ACCEPTED':
             check_policy(db, topic)
             award(db, topic.created_by, topic.id, 3, 'TOPIC_ACCEPTED', f'topic-accepted:{topic.id}')

@@ -1,25 +1,25 @@
-from threading import RLock
+from app.core.transactions import commit, write_lock
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.core.security import current_user, admin, hasher, token
-from app.models import *
-from app.schemas import *
-from app.services.decisions import *
-from app.services.ai import analysis_provider
+from app.models import (
+    AuthorityMembership, DeletionProposal, DiscussionMessage, ExpertReview, LedgerEntry, PointEvent, Rule, RuleCheck, SubTopic, Tag, Team, Topic, User, Vote
+)
+from app.schemas import (
+    AuthorityInput, Login, MessageInput, ProfileInput, ReasonInput, Register, ReviewInput, RoleInput, RuleInput, SubInput, TopicInput, VoteInput
+)
+from app.services.decisions import QUORUM, TARGETS, summary, eligible, target, cast_vote, close_vote, check_policy
+from app.services.records import require
+from app.services.ledger import append_ledger, verify_ledger
+from app.services.points import award
+from app.services.ai import AnalysisProvider, get_analysis_provider
 from app.services.authority import SCOPES, authority_info, require_authority, can_manage
 
 router = APIRouter(prefix='/api/v1')
-# Single-process demo: serialize writes so ledger reads and appends share a transaction.
-write_lock = RLock()
-def commit(db):
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, 'Kayıt zaten mevcut veya ilişki kısıtı ihlal edildi.')
+
 def row(obj):
     return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
 def public_user(user):
@@ -104,7 +104,7 @@ def start_voting(id: int, user=Depends(current_user), db: Session = Depends(get_
         topic = require(db, Topic, id)
         require_authority(user, topic)
         if not can_manage(user, topic):
-            raise HTTPException(403, 'Konu sahibi veya yönetici olmalısınız.')
+            raise HTTPException(403, 'Bu konuyu yönetme yetkiniz yok. Toplulukta konu sahibi/yönetici, kurumsal kararlarda ilgili kurul üyesi olmalısınız.')
         if topic.status != 'PROPOSED':
             raise HTTPException(409, 'Yalnızca öneri durumundaki konular oylamaya açılır.')
         topic.status = 'VOTING'
@@ -252,6 +252,10 @@ def add_review(id: int, data: ReviewInput, user=Depends(current_user), db: Sessi
         review = ExpertReview(topic_id=id, expert_id=user.id, **data.model_dump())
         db.add(review)
         db.flush()
+        if topic.decision_flag == 'EXPERT_REVIEW_REQUESTED':
+            topic.decision_flag = None
+        if topic.status == 'ACCEPTED':
+            check_policy(db, topic)
         append_ledger(db, 'EXPERT_REVIEWED', 'TOPIC', id, {'expert_id': user.id, **data.model_dump()})
         commit(db)
         return row(review)
@@ -265,8 +269,8 @@ def policy_checks(id: int, user=Depends(current_user), db: Session = Depends(get
 def rerun_policy(id: int, user=Depends(current_user), db: Session = Depends(get_db)):
     with write_lock:
         topic = require(db, Topic, id)
-        if user.role != 'ADMIN' and user.id != topic.created_by:
-            raise HTTPException(403, 'Konu sahibi veya yönetici olmalısınız.')
+        if not can_manage(user, topic):
+            raise HTTPException(403, 'Bu konuyu yönetme yetkiniz yok. Toplulukta konu sahibi/yönetici, kurumsal kararlarda ilgili kurul üyesi olmalısınız.')
         if topic.status != 'ACCEPTED':
             raise HTTPException(409, 'Konu önce kabul edilmiş olmalı.')
         check_policy(db, topic)
@@ -277,8 +281,8 @@ def rerun_policy(id: int, user=Depends(current_user), db: Session = Depends(get_
 def request_review(id: int, user=Depends(current_user), db: Session = Depends(get_db)):
     with write_lock:
         topic = require(db, Topic, id)
-        if user.id != topic.created_by and user.role != 'ADMIN':
-            raise HTTPException(403, 'Konu sahibi veya yönetici olmalısınız.')
+        if not can_manage(user, topic):
+            raise HTTPException(403, 'Bu konuyu yönetme yetkiniz yok. Toplulukta konu sahibi/yönetici, kurumsal kararlarda ilgili kurul üyesi olmalısınız.')
         if topic.decision_flag != 'MINORITY_CONFLICT':
             topic.decision_flag = 'EXPERT_REVIEW_REQUESTED'
         append_ledger(db, 'EXPERT_REVIEW_REQUESTED', 'TOPIC', id, {'actor': user.id})
@@ -286,10 +290,10 @@ def request_review(id: int, user=Depends(current_user), db: Session = Depends(ge
         return {'message': 'Bilirkişi görüşü istendi. Görüş kararı tek başına değiştirmez.'}
 
 @router.get('/topics/{id}/ai-analysis')
-def ai_analysis(id: int, user=Depends(current_user), db: Session = Depends(get_db)):
+def ai_analysis(id: int, user=Depends(current_user), db: Session = Depends(get_db), provider: AnalysisProvider = Depends(get_analysis_provider)):
     topic = require(db, Topic, id)
     similar = [t for t in db.scalars(select(Topic).where(Topic.id != id)) if {a.id for a in t.tags} & {a.id for a in topic.tags}][:4]
-    return analysis_provider.analyze(topic, similar, db.scalars(select(Rule)).all())
+    return provider.analyze(topic, similar, db.scalars(select(Rule)).all())
 
 @router.get('/rules')
 def rules(user=Depends(current_user), db: Session = Depends(get_db)):

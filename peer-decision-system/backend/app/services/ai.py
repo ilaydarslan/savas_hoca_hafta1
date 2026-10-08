@@ -16,3 +16,7 @@ class MockAnalysisProvider:
         }
 
 analysis_provider: AnalysisProvider = MockAnalysisProvider()
+
+
+def get_analysis_provider() -> AnalysisProvider:
+    return analysis_provider
