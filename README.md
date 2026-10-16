@@ -25,6 +25,9 @@ Yerel veritabanı, oturum anahtarı, bağımlılık klasörleri ve günlükler d
 
 ## Analiz, diyagramlar ve son düzenlemeler
 
+- [Use case, sequence ve class diyagramları (PDF)](peer-decision-system/docs/uml/Musterek_UML_Diyagramlari.pdf)
+- [Diyagramları görsel olarak incele](peer-decision-system/docs/uml/README.md)
+
 Güncellenmiş dört sayfalık [uygulama raporu](peer-decision-system/docs/Musterek_Guncellenmis_Proje_Raporu.pdf), kullanılan araçları, karar sürecini ve yapılan düzenlemeleri sade bir dille anlatır. Graf, sınıf ilişkileri ve oy verme sekansı görsellerini de içerir.
 
 Uygulamadaki **Analiz ve tasarım** menüsünden problem kanvası, ölçüm/hata analizi ve tasarım diyagramları açılır. **İlişki haritası** ise veritabanındaki güncel kullanıcı, takım, konu, oy ve tartışma ilişkilerini gösterir.
